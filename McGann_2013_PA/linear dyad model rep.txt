@@ -1,0 +1,32 @@
+# data{
+# for (i in 1:len){
+# # leftr[i]<-round(leftp[i]*n[i]/100)
+# # leftprop[i]<-leftp[i]/100
+# }
+# # secondyear<-startyear+1
+# }
+
+model{
+
+##loop over the data
+for (i in 1:len){
+mu[i]<-alpha[q[i]] + beta[q[i]] * dyadr[year[i]-1949]
+leftp.sim[i]~dnorm(mu[i], tau)
+# leftp.rep[i]<-leftprop.rep[i]*100
+# leftprop.rep[i]~dnorm(mu[i], tau)
+# sqresid[i]<-(leftp[i]-leftp.rep[i])^2
+
+}
+
+##priors for this model
+#tau~dunif(0.001,100)
+tau~dnorm(m.tau, sd.tau) T(0,)
+
+for (i in 1:nquest){
+alpha[i]~dnorm(m.alpha[i],sd.alpha[i])
+beta[i]~dnorm(m.beta[i], sd.beta[i])
+}
+
+
+
+}

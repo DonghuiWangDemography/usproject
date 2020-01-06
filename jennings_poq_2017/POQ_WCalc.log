@@ -1,0 +1,66 @@
+Estimation Report for File: C:\Users\Will\Dropbox\Popular Understandings of Politics\Data\distrust_all2.dta
+
+295 records after date scan
+
+Period: 1944 to 2016, 73 Time Points
+
+Number of Series: 37
+
+Exponential Smoothing: On
+
+Iteration History: Dimension 1
+Iter Convergence Criterion Items Reliability AlphaF AlphaB
+   1       .2321      .001    37        .921   .500   .500
+   2       .0169      .001    37        .915   .500   .505
+   3       .0045      .001    37        .912   .503   .505
+   4       .0011      .001    37        .912   .505   .505
+   5       .0006      .001    37        .911   .504   .504
+
+
+Loadings and descriptive variable information
+                                 Dim 1     Dim 2
+Vn        Variable     Cases Loading   Loading   Mean    Std Deviation
+------------------------------------------------------------------------
+    1  govtrust_bsa   20     .864     .000    24.715     7.981
+   28   eb_trustprl   17     .935     .000    59.327     7.114
+   29   eb_trustgov   16     .858     .000    64.928     7.005
+   15   trust_mori2   18     .609     .000    75.611     3.112
+   33      h_govsys   19     .571     .000    62.672     7.636
+   16     bsa_votes   14     .652     .000    72.907     3.775
+   14   trust_mori1   17     .364     .000    73.412     3.465
+   37   cspl_pubstd    6     .914     .000    21.500     8.770
+   17       bsa_MPs   14     .341     .000    74.043     2.245
+    7      improp_g    5     .913     .000    57.600     8.114
+   19  bsa_poltrust   15     .302     .000    91.920     1.535
+   20   bsa_parties    7     .621     .000    68.214     3.016
+   35     h_parlsat    6     .665     .000    34.333     1.886
+   22     bes_nosay    4     .990     .000    51.425     5.054
+    9     pollies_g    4     .957     .000    82.250     3.832
+   11      mpgain_m    4     .948     .000    57.000     9.618
+   12    trustmps_m    4     .776     .000    68.501     5.853
+   34      h_mpssat    5     .610     .000    38.000     3.098
+   26  bes_mpstrust    3     .999     .000    52.736     3.120
+    2        pols_g    3     .991     .000    40.333     5.558
+   32 ess_trustparl    7     .409     .000    48.579     2.431
+    8      polmor_g    4     .715     .000    54.250    11.432
+    4     pols_mori    6     .420     .000    53.667     5.121
+    3    efficacy_g    2    1.000     .000    69.500     1.500
+    5    govtrust_m    2    1.000     .000    69.006     1.994
+    6   govtrust2_m    2    1.000     .000    45.500     2.500
+   10       spint_g    2    1.000     .000    72.000     5.000
+   21   bes_parties    2    1.000     .000    23.182     5.119
+   23  bes_govtrust    2    1.000     .000    10.900     1.700
+   25   bes_wmtrust    2    1.000     .000    35.500     5.500
+   36      bsa_pols    2    1.000     .000    43.500     2.500
+   27  bes_polmoney    3     .604     .000    58.553     1.033
+   24 bes_polstrust    3     .601     .000    52.000     6.532
+   31  ess_trustpol    7     .098     .000    61.850     2.344
+   13    trustown_m    4    -.461     .000    40.750     4.023
+   30     eb_polcor    2   -1.000     .000    59.710     1.670
+   18 bsa_govtrust2    3    -.836     .000    61.667      .713
+
+Dimension 1 Information
+Eigen Estimate 1.77 of possible 3.51
+  Pct Variance Explained: 50.39
+
+Weighted Average Metric: Mean:  51.89 St. Dev:   4.61

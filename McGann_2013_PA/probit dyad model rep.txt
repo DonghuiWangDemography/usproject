@@ -1,0 +1,43 @@
+#Replication version of basic irt model
+
+data{
+for (i in 1:len){
+leftr[i]<-round(leftp[i]*n[i]/100)
+}
+secondyear<-startyear+1
+}
+
+
+model{
+
+
+
+##loop over the data
+for (i in 1:len){
+sqresid[i]<-(leftp[i]-leftp.sim[i])^2
+leftp.exp[i]<-m[i]*100
+leftp.sim[i]<-leftr.sim[i]/n[i]*100
+leftr.sim[i]~dbin(p[i], n[i])
+p[i]~dbeta(a[i], b)
+a[i]<--b*m[i]/(m[i]-1)
+m[i]<-phi(x[i])
+x[i]<-((dyadr[year[i]-1949]-52.14)/4.988 - lambda[q[i]]) / alpha[q[i]]
+}
+
+##priors for this model
+##mu[endyear]<-0
+##mu[3]<- -1
+
+b~dnorm(m.b, sd.b) T(0,)
+##lambda[1]<-0
+##alpha[1]<-0.25
+
+for (i in 1:nquest){
+lambda[i]~dnorm(m.lambda[i], sd.lambda[i])
+alpha[i]~dnorm(m.alpha[i], sd.alpha[i]) T(0,)
+}
+
+
+}
+
+

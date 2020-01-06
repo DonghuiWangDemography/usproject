@@ -1,0 +1,38 @@
+#All parameters fixed at mean, except for lambda
+
+data{
+for (i in 1:len){
+leftr[i]<-round(leftp[i]*n[i]/100)
+}
+secondyear<-startyear+1
+}
+
+
+model{
+
+
+
+##loop over the data
+for (i in 1:len){
+# sqresid[i]<-(leftp[i]-leftp.rep[i])^2
+# leftp.exp[i]<-m[i]*100
+# leftp.rep[i]<-leftr.rep[i]/n[i]*100
+# leftr.rep[i]~dbin(p[i], n[i])
+# p.rep[i]~dbeta(a[i], b)
+
+dif[i]<-step(lambda[i]-m.lambda[q[i]])
+leftr[i]~dbin(p[i], n[i])
+p[i]~dbeta(a[i], m.b)
+a[i]<--m.b*m[i]/(m[i]-1)
+m[i]<-phi(x[i])
+x[i]<-(m.mu[year[i]-1946] - lambda[i]) / sqrt((m.alpha[q[i]])^2+(m.sigma[year[i]-1946])^2)
+
+
+#priors for model
+lambda[i]~dunif(-10,10)
+}
+
+
+}
+
+

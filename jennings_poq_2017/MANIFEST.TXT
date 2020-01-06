@@ -1,0 +1,12 @@
+GallupYouGov.dta (application/x-stata) 1608 bytes.
+POQ Dataverse Codebook.docx (application/vnd.openxmlformats-officedocument.wordprocessingml.document) 14703 bytes.
+POQ_Fig1.do (application/x-stata-syntax) 940 bytes.
+POQ_Fig2.do (application/x-stata-syntax) 748 bytes.
+POQ_Fig3.do (application/x-stata-syntax) 623 bytes.
+POQ_Items.dta (application/x-stata-13) 10495 bytes.
+POQ_Mood.csv (text/csv) 949 bytes.
+POQ_Replication.dta (application/x-stata-13) 51498 bytes.
+POQ_Replication.xlsx (application/vnd.openxmlformats-officedocument.spreadsheetml.sheet) 46029 bytes.
+POQ_Sensitivity.dta (application/x-stata) 37871 bytes.
+POQ_SensitivityTests.do (application/x-stata-syntax) 537 bytes.
+POQ_WCalc.log (application/octet-stream) 3395 bytes.

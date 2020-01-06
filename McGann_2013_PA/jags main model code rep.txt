@@ -1,0 +1,60 @@
+#Replication version of basic irt model
+
+data{
+for (i in 1:len){
+leftr[i]<-round(leftp[i]*n[i]/100)
+}
+secondyear<-startyear+1
+}
+
+
+model{
+
+
+
+##loop over the data
+for (i in 1:len){
+sqresid[i]<-(leftp[i]-leftp.sim[i])^2
+leftp.exp[i]<-m[i]*100
+leftp.sim[i]<-leftr.sim[i]/n[i]*100
+leftr.sim[i]~dbin(p[i], n[i])
+p[i]~dbeta(a[i], b)
+a[i]<--b*m[i]/(m[i]-1)
+m[i]<-phi(x[i])
+x[i]<-(mu[year[i]] - lambda[q[i]]) / sqrt((alpha[q[i]])^2+(sigma[year[i]])^2)
+}
+
+##priors for this model
+##mu[endyear]<-0
+##mu[3]<- -1
+
+b~dnorm(m.b, sd.b) T(0,)
+##lambda[1]<-0
+##alpha[1]<-0.25
+
+for (i in 1:nquest){
+lambda[i]~dnorm(m.lambda[i], sd.lambda[i])
+alpha[i]~dnorm(m.alpha[i], sd.alpha[i]) T(0,)
+}
+
+for (i in startyear:1978){
+mu[i]~dnorm(m.mu[i-(startyear-1)], sd.mu[i-(startyear-1)])
+}
+
+for (i in 1980:1996){
+mu[i]~dnorm(m.mu[i-(startyear-1)], sd.mu[i-(startyear-1)])
+}
+
+for (i in 1998:2005){
+mu[i]~dnorm(m.mu[i-(startyear-1)], sd.mu[i-(startyear-1)])
+}
+
+for (i in startyear:(endyear)){
+sigma[i]~dnorm(m.sigma[i-(startyear-1)], sd.sigma[i-(startyear-1)]) T(0,)
+}
+
+mu[1979]<--1
+mu[1997]<-1
+}
+
+

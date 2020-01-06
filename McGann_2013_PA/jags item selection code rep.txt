@@ -1,0 +1,36 @@
+#Calculation of T statistic -- goodness of fit of administrations
+
+data{
+for (i in 1:len){
+leftr[i]<-round(leftp[i]*n[i]/100)
+}
+secondyear<-startyear+1
+}
+
+
+model{
+
+
+
+##loop over the data
+for (i in 1:len){
+sqresid[i]<-(leftp[i]-m.leftp[i])^2
+rep.sqresid[i]<-(leftp.sim[i]-m.leftp[i])^2
+dsqresid[i]<-sqresid[i]-rep.sqresid[i]
+t[i]<-step(dsqresid[i])
+
+
+m.leftp[i]<-m[i]*100
+leftp.sim[i]<-leftr.sim[i]/n[i]*100
+leftr.sim[i]~dbin(p[i], n[i])
+p[i]~dbeta(a[i], m.b)
+a[i]<--m.b*m[i]/(m[i]-1)
+
+m[i]<-phi(x[i])
+x[i]<-(m.mu[year[i]-(startyear-1)] - m.lambda[q[i]]) / sqrt((m.alpha[q[i]])^2+(m.sigma[year[i]-(startyear-1)])^2)
+}
+
+
+}
+
+
