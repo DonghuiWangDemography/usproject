@@ -6,7 +6,7 @@
 cd "C:\Users\donghuiw\Dropbox\Website\US_project\cleaned_data"
 global image "C:\Users\donghuiw\Dropbox\Website\US_project\image"  // pc 
 
-cd "/Users/donghui/Dropbox/Website/US_project/cleaned_data"  //mac 
+// cd "/Users/donghui/Dropbox/Website/US_project/cleaned_data"  //mac 
 
 
 *prepare to export 
@@ -20,7 +20,7 @@ use dra_agg.dta, clear
 save tws_dyd, replace 
 
 
-*hand written 
+*---------dyad ratio-------------- 
 use dra_agg.dta, clear
 	keep if var =="PEW_4" 
 	keep if inrange(syear, 2005,2017)
@@ -39,8 +39,8 @@ use dra_agg.dta, clear
 save tws.dta, replace 
 
 * import results from stimoson's software (no smoothing )
-
-import delimited /Users/donghui/Dropbox/Website/US_project/cleaned_data/tws_dyd.Csv, clear
+*import delimited /Users/donghui/Dropbox/Website/US_project/cleaned_data/tws_dyd.Csv, clear
+ import delimited "C:\Users\donghuiw\Dropbox\Website\US_project\cleaned_data\tws_dyd.Csv", clear
 	rename v1 syear 
 	rename v2 stm
 tempfile stm
@@ -57,13 +57,13 @@ use tws.dta, replace
 	
 	drop date
 	
-	replace p=100*p/p[13]
-	replace g=100*g/g[13]
+// 	replace p=100*p/p[13]
+// 	replace g=100*g/g[13]
 	
 	* t=12 	
 	g pr12=p[12]/p[13]
 	g gr12=g[12]/g[13]
-	egen r12=rowmean(pr12 gr12)
+	egen r12=rowmean(pr12 gr12)  // t13- t12 ratio 
 	
 	g p12=p[13]*r12
 	g g12=g[13]*r12
@@ -73,7 +73,7 @@ use tws.dta, replace
 
 	forval i=11(-1)1 {
 	local  j = `i'+1
-	display " `i' ,`j'"
+	display " `i',`j'"
 	
 	g pr`i'=p[`i']/p[`j']
 	g gr`i'=g[`i']/g[`j']
@@ -82,13 +82,11 @@ use tws.dta, replace
 	g c`i'=c`j'*r`i' 
 	}
 
-keep syear g p id stm c*
-
 	g b=.
 	forval i=1/12{
 	replace b=c`i' if id==`i'
-	}
-	drop c*
+		}
+keep syear g p id b  stm
 	
 tempfile b
 save `b.dta', replace 
@@ -103,8 +101,8 @@ use tws.dta, replace
 	
 	drop date
 	
-	replace p=100*p/p[1]
-	replace g=100*g/g[1]
+// 	replace p=100*p/p[1]
+// 	replace g=100*g/g[1]
 	
 	* t=2	
 	g pr2=p[2]/p[1]
@@ -141,33 +139,8 @@ keep syear g p id  c*
 	egen dyd=rowmean(f b)
 	
 	sort syear 
-	twoway connected stm syear || connected dyd syear || connected f syear || connected b syear || connected g syear || connected p syear 
-	
-	
+	twoway connected stm syear || connected dyd syear 
 
-	
-	*smoothing 
-	*simple exponential forecasts are optimal for an ARIMA (0,1,1) model
-	tsset id 
-	arima forward, arima(0,1,1)
-	scalar sf= 1+ (-.99999525)
-	
-	arima back, arima(0,1,1)
-	scalar sb= 1+ (-.9999911)
-
-	
-	g f=sf*forward + (1-sf)*forward[_n-1]
-	g b=sb*back + (1-sb)*back[_n-1]
-	egen dyd=rowmean(f  b)
-	
-	sort syear 
-	twoway connected f syear || connected forward syear 
-
-	sort syear 
-	twoway connected b syear || connected back syear 
-	
-	sort syear 
-	twoway connected dyd syear 
 
 * prepare to export 
 erase pew.dta
