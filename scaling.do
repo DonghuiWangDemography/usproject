@@ -1,16 +1,20 @@
-*scaling
+*merge data , descriptive graphs 
+
+// ssc install grstyle
+// ssc install tabplot 
+
 *created in 12/17/2019
 * prior do file agg.do 
 
-cd "C:\Users\donghuiw\Dropbox\Website\US_project\cleaned_data"
-global image "C:\Users\donghuiw\Dropbox\Website\US_project\image"  // pc 
+// cd "C:\Users\donghuiw\Dropbox\Website\US_project\cleaned_data"
+// global image "C:\Users\donghuiw\Dropbox\Website\US_project\image"  // pc 
 
 
 // cd "C:\Users\wdhec\Dropbox\Website\US_project\cleaned_data"   laptop 
 // global image "C:\Users\donghuiw\Dropbox\Website\US_project\image"
 
-//cd "/Users/donghui/Dropbox/Website/US_project/cleaned_data"  // mac 
-
+cd "/Users/donghui/Dropbox/Website/US_project/cleaned_data"  // mac 
+global image "/Users/donghui/Dropbox/Website/US_project/image"
 
 *---------ignore 9999 (dk)--------------
 use agg_raw.dta,clear 
@@ -24,6 +28,8 @@ use agg_raw.dta,clear
 	rename edate enddate 
 
 	replace pct = nresp/adjsize 
+	
+	
 	*cpt
 	sort questionid resp 
 	by questionid : g rid=_n
@@ -31,12 +37,7 @@ use agg_raw.dta,clear
 	by questionid: g total=cpt[_N]
 	drop n 
 	rename adjsize n
-	
-// 	*adjust gallup 1977
-// 	replace resp =1 if  varname == "USGALLUP_4" & syear == 1977 & inrange(cpt,0,0.4)
-// 	replace resp =2 if  varname == "USGALLUP_4" & syear == 1977 & inrange(cpt,0.4,0.66)
-// 	replace resp =3 if  varname == "USGALLUP_4" & syear == 1977 & inrange(cpt,0.67,0.99)
-// 	replace resp =4 if  varname == "USGALLUP_4" & syear == 1977 & cpt ==1
+	duplicates drop
 
 	
 keep resp questionid resp pct enddate scale varname syear n cpt nresp meanval
@@ -152,24 +153,202 @@ append using `agg.dta'
 
 sort syear questionid resp
 
-g sid=_n
+	g sid=_n
+
+	format  enddate  %td
+	drop if syear ==1955
+	
+	encode questionid, g(qid)
+
+* number of running years 
+	unique(syear), by(varname) gen(nyr)
+	bysort  varname : egen nyear=max(nyr)
+
+* number of unique surveys 
+	unique (questionid), by(syear) gen(ns)
+	bysort syear: egen nsurvey=max(ns)
 
 
-
-format  enddate  %td
-
-drop if syear ==1955
-
-*quesionid
-
-encode questionid, g(qid)
+	drop if nyear==1
+	drop  ns  nyr
 
 save scaling.dta, replace 
 
 
-*----------------------
-use scaling.dta, clear
+*----------------------graph---------------
 
+use scaling.dta, clear
+	
+	*Fig 1 cross tab the avaiability 
+	tabplot syear varname,subtitle("") height(1) xtitle(survey) 
+//	graph save Graph  "$image/survey.gph",replace 
+// 	graph use   "$image/survey.gph"
+// 	graph export "$image/survey.png",replace 
+	encode varname,gen(var)
+	*re-order
+	
+	
+	*mid-point 
+	sort  questionid resp  
+	bysort questionid : g midpoint = pct/2 +cpt[_n-1]
+	replace  midpoint = pct/2 if midpoint ==. 	
+	g mid = round(midpoint*100 , 0.01) 
+	
+		
+	 #delimit ;
+	recode var (3 =1 "PEW") 
+			   (8 =2 "USGALLUP_4")
+			   (4 =3 "TRA_4")
+			   (10=4 "USORC_4")
+			   (11=5  "USPSRA_4")
+			   (12=6 "USZOGBY_4")
+			   (2 =7 "GSS")
+			   (7= 8 "USGALLUP_10")
+			   (1=9 "ABC")
+			   (6=10 "USCBS_3")
+			   (4=11 "TRA_5")
+			   (9=12 "USKN_5")
+			   ,
+	gen(varid);
+	#delimit cr	  
+
+	
+// 	grstyle init
+// 	grstyle set lpattern	
+	
+	la var syear "year"
+	la var meanval "Mean"
+	sort syear
+	twoway connected meanval syear, by(varid) col(3) ylab(0(2)10)
+	graph export  "$image/mean.png" , replace 
+	
+	
+	sort syear
+	 #delimit ;
+	twoway (connected meanval syear if varname =="PEW")
+		   (connected meanval syear if varname=="USGALLUP_4")
+		   ,
+		 title("2 scales")
+		 ytitle(Mean)
+		 xtitle (Year)
+		 ylab(1(1)4)
+		  legend(col(1) 
+			 order(1 "PEW"
+				   2 "Gallup"				   
+				   ))
+				  ;
+		#delimit cr	 
+		
+	*Fig 2 
+	* 3
+// 	grstyle init
+// 	grstyle set lpattern
+
+	
+	 #delimit ;
+
+	twoway (connected meanval syear if varname =="ABC")
+		   (connected meanval syear if varname=="USCBS_3")
+		   ,
+		 title("2 scales")
+		 ytitle(Mean)
+		 xtitle (Year)
+		 ylab(1(1)3)
+		  legend(col(1) 
+			 order(1 "ABC"
+				   2 "USCBS_3"				   
+				   ))
+				  ;
+		#delimit cr	  
+		
+		graph save Graph "$image\s3.gph", replace 
+
+
+	#delimit ;
+	twoway	(connected meanval syear if varname =="PEW"      )
+			(connected meanval syear if varname =="USGALLUP_4" )
+			(connected meanval syear if varname =="TRA_4")
+			(connected meanval syear if varname =="USORC_4" & syear > 1990)
+			(connected meanval syear if varname =="USPSRA_4")
+			(connected meanval syear if varname =="USZOGBY_4")		
+			   , 
+		   title("4 scale")
+		   ytitle("mean") 
+		   xtitle("year") 
+		   ylab(1(1)4)
+		   legend(col(1) 				 
+				 order( 1 "PEW" 
+					   2 "Gallup" 
+					   3 "Trans Atlantic Trends"
+					   4 "NORC"
+					   5 "USPSRA"
+					   6 "USZOGBY"
+					   ))
+					  ;
+	#delimit cr	   
+	graph save Graph "$image\s4.gph", replace 
+
+	
+	
+	#delimit ;
+	twoway	(connected meanval syear if varname =="TRA_5")
+			(connected meanval syear if varname =="USKN_5")
+			   , 
+		   title("5 scale")
+		   ytitle("mean") 
+		   xtitle("year") 
+		   ylab(1(1)5)
+		   legend(col(1) 
+				 order(1 "TRA_5"
+					   2 "USKN_5"
+					   ))
+					  ;
+	#delimit cr	   
+	graph save Graph "$image\s5.gph", replace 
+
+
+   #delimit ;
+	twoway	(connected meanval syear if varname =="GSS")
+			(connected meanval syear if varname =="USGALLUP_10")
+			   , 
+		   title("10 scale")
+		   ytitle("mean") 
+		   xtitle("year") 
+		   ylab(1(1)10)
+		   legend(col(1) 
+				 order(1 "GSS"
+					   2 "USGALLUP_10"
+					   ))
+					  ;
+	#delimit cr	   
+	graph save Graph "$image\s10.gph", replace 
+
+	graph combine  "$image\s3.gph" "$image\s4.gph" "$image\s5.gph"  "$image\s10.gph" 
+
+	
+	
+	sort syear resp
+	list syear questionid resp pct if varname=="USORC_4"
+	
+	
+* experiment with midpoint 
+	
+
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+*=========No longer useful==============
+use scaling.dta, clear
 *prepare for optimization 
 	recode resp(1=-5)(2=-4)(3=-1)(4=-2)(5=-1)(6=1)(7=2)(8=3)(9=4)(10=5) if varname =="GSS"
 	
@@ -190,14 +369,14 @@ keep if syear == 1989
 sort resp
  
  #delimit ;
- twoway (connected nresp resp if varname == "GSS")  
-		(connected nresp resp if varname == "USCAMREP_9" )  
-		(connected nresp resp if questionid == "USGALLUP.040689.R1D")
-		(connected nresp resp if questionid == "USGALLUP.081689.R02A") 
-		(connected nresp resp if varname == "USLAT_4" ) 
-		(connected nresp resp if varname == "USCBS_3" ) 
-		(connected nresp resp if questionid == "USABCWP.89JAPN.R35E")
-		(connected nresp resp if questionid == "USABCWP.89APR.R41G") 
+ twoway (connected cpt resp if varname == "GSS")  
+		(connected cpt resp if varname == "USCAMREP_9" )  
+		(connected cpt resp if questionid == "USGALLUP.040689.R1D")
+		(connected cpt resp if questionid == "USGALLUP.081689.R02A") 
+		(connected cpt resp if varname == "USLAT_4" ) 
+		(connected cpt resp if varname == "USCBS_3" ) 
+		(connected cpt resp if questionid == "USABCWP.89JAPN.R35E")
+		(connected cpt resp if questionid == "USABCWP.89APR.R41G") 
           , 
 	   title("8 surveys in 1989")
 	   ytitle("cumulative freq") 
@@ -292,7 +471,6 @@ drop dif1-dif100
 				  ;
 #delimit cr	  
 graph export "$image\dis_1989_after.png",replace 
-
 
 
 
@@ -662,12 +840,12 @@ use ref_gss_midpoint , clear
 //
 // sort questionid resp newscale 
 // #delimit ;
-// twoway (scatter resp newscale  if syear == 1977)  
-// 	   (scatter resp newscale  if syear == 1985) 
-// 	   (scatter resp newscale  if questionid == "USGALLUP.040689.R1D")  
-// 	   (scatter resp newscale  if questionid == "USGALLUP.081689.R02A")  
-// 	   (scatter resp newscale  if syear == 1991)
-// 	   (scatter resp newscale  if syear == 1993)
+// twoway (connected resp newscale  if syear == 1977)  
+// 	   (connected resp newscale  if syear == 1985) 
+// 	   (connected resp newscale  if questionid == "USGALLUP.040689.R1D")  
+// 	   (connected resp newscale  if questionid == "USGALLUP.081689.R02A")  
+// 	   (connected resp newscale  if syear == 1991)
+// 	   (connected resp newscale  if syear == 1993)
 // 	   ,
 // 	   title("Gallup(4) to GSS")
 // 	   legend(col(1) 
@@ -684,8 +862,8 @@ use ref_gss_midpoint , clear
 
 sort questionid resp newscale
 #delimit ;
-twoway (scatter newscale  resp  if syear == 1983 & varname=="USGALLUP_10")  
-	   (scatter newscale  resp  if syear == 1993 & varname=="USGALLUP_10" ) 
+twoway (connected newscale  resp  if syear == 1983 & varname=="USGALLUP_10")  
+	   (connected newscale  resp  if syear == 1993 & varname=="USGALLUP_10" ) 
 	   ,
 	   title("Gallup(10) to GSS")
 	   xtitle(gallup(10))
@@ -705,11 +883,11 @@ graph save Graph gallup10_gss.gph, replace
 
 sort questionid resp newscale
 #delimit ;
-twoway (scatter newscale  resp  if syear == 1977 & varname=="USGALLUP_4")  
-	   (scatter newscale  resp  if syear == 1985 & varname=="USGALLUP_4" ) 
-	   (scatter newscale  resp  if syear == 1989 & varname=="USGALLUP_4" )
-	   	(scatter newscale  resp  if syear == 1991 & varname=="USGALLUP_4" )
-	   	(scatter newscale  resp  if syear == 1993 & varname=="USGALLUP_4" )
+twoway (connected newscale  resp  if syear == 1977 & varname=="USGALLUP_4")  
+	   (connected newscale  resp  if syear == 1985 & varname=="USGALLUP_4" ) 
+	   (connected newscale  resp  if syear == 1989 & varname=="USGALLUP_4" )
+	   	(connected newscale  resp  if syear == 1991 & varname=="USGALLUP_4" )
+	   	(connected newscale  resp  if syear == 1993 & varname=="USGALLUP_4" )
 	   ,
 	   title("Gallup(4) to GSS")
 	   	   xtitle(gallup(4))
@@ -821,18 +999,18 @@ sort newscale
 
 sort questionid newscale  resp 
 #delimit ;
-twoway (scatter newscale  resp  if syear == 2005 & varname == "USGALLUP_4")  
-	   (scatter newscale  resp  if syear == 2006 & varname == "USGALLUP_4") 
-	   (scatter newscale  resp  if syear == 2007 & varname == "USGALLUP_4")
-	   (scatter newscale  resp  if syear == 2008 & varname == "USGALLUP_4") 
-	   (scatter newscale  resp  if syear == 2009 & varname == "USGALLUP_4") 
-	   (scatter newscale  resp  if syear == 2010 & varname == "USGALLUP_4") 
-	   (scatter newscale  resp  if syear == 2011 & varname == "USGALLUP_4") 
-	   (scatter newscale  resp  if syear == 2012 & varname == "USGALLUP_4") 
-	   (scatter newscale  resp  if syear == 2013 & varname == "USGALLUP_4") 
-	   (scatter newscale  resp  if syear == 2014 & varname == "USGALLUP_4") 
-	   (scatter newscale  resp  if syear == 2015 & varname == "USGALLUP_4") 
-	   (scatter newscale  resp  if syear == 2017 & varname == "USGALLUP_4") 
+twoway (connected newscale  resp  if syear == 2005 & varname == "USGALLUP_4")  
+	   (connected newscale  resp  if syear == 2006 & varname == "USGALLUP_4") 
+	   (connected newscale  resp  if syear == 2007 & varname == "USGALLUP_4")
+	   (connected newscale  resp  if syear == 2008 & varname == "USGALLUP_4") 
+	   (connected newscale  resp  if syear == 2009 & varname == "USGALLUP_4") 
+	   (connected newscale  resp  if syear == 2010 & varname == "USGALLUP_4") 
+	   (connected newscale  resp  if syear == 2011 & varname == "USGALLUP_4") 
+	   (connected newscale  resp  if syear == 2012 & varname == "USGALLUP_4") 
+	   (connected newscale  resp  if syear == 2013 & varname == "USGALLUP_4") 
+	   (connected newscale  resp  if syear == 2014 & varname == "USGALLUP_4") 
+	   (connected newscale  resp  if syear == 2015 & varname == "USGALLUP_4") 
+	   (connected newscale  resp  if syear == 2017 & varname == "USGALLUP_4") 
 
 	   ,
 	   title("Gallup to PEW")
@@ -1002,9 +1180,9 @@ use ref_gallup_midpoint, replace
 
 sort questionid resp newscale
 #delimit ;
-twoway (scatter newscale  resp  if syear == 1998 & varname=="USCBS_3")  
-	   (scatter newscale  resp  if syear == 1999 & varname=="USCBS_3" ) 
-	   (scatter newscale  resp  if syear == 2001 & varname=="USCBS_3" )
+twoway (connected newscale  resp  if syear == 1998 & varname=="USCBS_3")  
+	   (connected newscale  resp  if syear == 1999 & varname=="USCBS_3" ) 
+	   (connected newscale  resp  if syear == 2001 & varname=="USCBS_3" )
 	   ,
 	   title("USCBS to GALLUP4")
 	   xtitle(uscbs)
@@ -1119,10 +1297,10 @@ twoway	(connected z_mean syear if varname =="GSS" )
 	   (connected z_mean syear if varname =="USGALLUP_10")
 	   (connected z_mean syear if varname =="PEW_4"      )
 	    (connected z_mean syear if varname =="USGALLUP_4" )
-        (scatter z_mean syear if varname =="TRA_4")
-		(scatter z_mean syear if varname =="USORC_4")
-		(scatter z_mean syear if varname =="USPSRA_4")
-		(scatter z_mean syear if varname =="USZOGBY_4")		
+        (connected z_mean syear if varname =="TRA_4")
+		(connected z_mean syear if varname =="USORC_4")
+		(connected z_mean syear if varname =="USPSRA_4")
+		(connected z_mean syear if varname =="USZOGBY_4")		
 		(connected z_mean syear if varname =="TRA_5")
 		(connected z_mean syear if varname =="USKN_5")
 		(connected z_mean syear if varname =="USCBS_3")

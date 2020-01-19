@@ -7,7 +7,7 @@
 cd "/Users/donghui/Dropbox/Website/US_project/cleaned_data"
 global image  "/Users/donghui/Dropbox/Website/US_project/image"
 
-set scheme Cleanplots
+set scheme Cleanplots, perm
 
 
 * illustration 
@@ -17,15 +17,28 @@ use scaling, clear
 	keep if syear ==1993
 	keep if inlist(varname, "USGALLUP_4", "GSS")
 	
+	replace resp = -1 * resp if varname == "GSS"
 	*mid-point 
 	sort  questionid resp  
 	bysort questionid : g midpoint = pct/2 +cpt[_n-1]
 	replace  midpoint = pct/2 if midpoint ==. 	
 	g mid = round(midpoint*100 , 0.01) 
-
+	
+	g zero =0 
+    #delimit ;
+	twoway (bar resp  pt  if varname == "GSS" , hor xline(0) ) 
+		   (bar resp pt if varname =="USGALLUP_4", hor )
+		   (scatter mid zero, mlabel(mid))
+		   ;
+	delimit cr 
+	
+	
 	levelsof (midpoint) if varname == "GSS",local(gs)
 	twoway connected  cpt resp  if varname == "GSS" , yline(`gs') 
-	graph save Graph gss.gph, replace  
+	*graph save Graph gss.gph, replace  
+	
+// 	twoway (connected cpt resp if varname == "GSS") ///
+// 	       (spike  resp mid if varname == "GSS" ,hor yaxis(2))
 	
 // 	levelsof (midpoint) if varname == "USGALLUP_4",local(ga)
 // 	twoway connected  cpt resp  if varname == "USGALLUP_4" , yline(`ga')  
