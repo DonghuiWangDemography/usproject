@@ -373,6 +373,9 @@ graph export "$image/gallup_pew.png",replace
 	
 	merge 1:m qid using scaling, nogen 
 	
+	*for each pairs, calculate the mean 
+	
+	
 	
 	
 	
