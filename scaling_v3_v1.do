@@ -1,11 +1,11 @@
 *scaling on the basis of percentile 
 
-// cd "C:\Users\donghuiw\Dropbox\Website\US_project\cleaned_data"
-// global image "C:\Users\donghuiw\Dropbox\Website\US_project\image"  // pc 
+cd "C:\Users\donghuiw\Dropbox\Website\US_project\cleaned_data"
+global image "C:\Users\donghuiw\Dropbox\Website\US_project\image"  // pc 
 
 
-cd "/Users/donghui/Dropbox/Website/US_project/cleaned_data"
-global image  "/Users/donghui/Dropbox/Website/US_project/image"
+// cd "/Users/donghui/Dropbox/Website/US_project/cleaned_data"
+// global image  "/Users/donghui/Dropbox/Website/US_project/image"
 
 set scheme Cleanplots, perm
 
@@ -159,6 +159,52 @@ twoway (connected mean_b_`first'_`year'  syear if varname == "`first'"  &  syear
 graph save Graph `first'_`second'_`year'.gph, replace 
 end 	
 set trace off 
+
+
+set trace on 
+	
+*the case of two survey
+ program drop  two 
+
+	program two
+	args first second 
+	
+	
+	use adj.dta, clear  // adjust the data 
+	levelsof syear if varname=="`second'" , local(yr)	// bx first is the base 
+	
+	foreach x of local yr {	
+	anchor `x' `first' `second'	
+	g       anchor_`x' = mean_b_`first'_`x'   if varname =="`first'"    & syear <= `x'
+	replace anchor_`x' = mean_b_`second'_`x'  if varname == "`second'"  & syear > `x'		
+	keep syear qid varname enddate	anchor_`x'	
+	
+	drop if anchor_`x' ==.	
+	
+	tempfile y`x'
+    save `y`x'', replace 	
+	
+	}	
+	
+	use adj.dta, clear 
+    levelsof syear if varname=="`second'" , local(yr)
+	keep qid 
+	duplicates drop 
+
+	foreach x of local yr {
+	merge 1:1 qid using `y`x'', nogen 
+	
+	}
+	
+	sort syear
+	drop qid varname 
+	egen anchor = rowmean(anchor_*)
+	
+	end 
+set trace off 
+
+
+
 
 
 
@@ -326,6 +372,16 @@ local yr "2005 2006 2007 2008 2010 2009 2011 2012 2013 2015 2017"
 	la var  anchor_`x' "Anchoring year: `x' "
 	}
 	
+// 	merge 1:1 enddate using gallup_pew_two, nogen 
+//	
+// 	#delimit; 
+// 	twoway (line anchor_2006 syear) 
+// 		   (line anchorv2_2006 syear)
+//		   
+// 			   ;
+// 	# delimit cr	   
+		   
+	
 	sort enddate 
 	#delimit; 
 	twoway (line anchor syear, lwidth(medthick))
@@ -376,19 +432,411 @@ graph export "$image/gallup_pew.png",replace
 	
 *======Gallup and every other survey ==========
 	use scaling.dta, clear 
-    keep syear varname qid nsurvey
+    keep syear  varname qid nsurvey enddate
 	duplicates drop 
+	
 	*identify surveys that overlap with gallup 
 	g lap_1= (varname =="USGALLUP_4" & nsurvey >1) 
 	bysort syear: egen lap=max(lap_1)
+	
+	*for the ease of calculation, keep the earliest survey per yr if there are multiples
+	sort varname syear enddate 
+	bysort varname syear : gen syid=_n
+	drop if syid >1 
 	
 	keep qid lap 
 	
 	merge 1:m qid using scaling, nogen 
 	
-	*for each pairs, calculate the mean 
+	
+	keep if lap==1
+	
+	*tabplot syear varname,subtitle("") height(1) xtitle(survey) 
+	save adj.dta, replace 
 	
 	
 	
+// 	two USGALLUP_4 PEW
+// 	drop if syear ==.	
+// 	rename anchor_* apew_*
+// 	save gallup_pew_two, replace 
+	
+
+	*calculate others 
+	use adj,clear
+	levelsof varname 
+	
+	local var "ABC GSS PEW TRA_4 TRA_5  USCBS_3 USGALLUP_10 USKN_5 USORC_4 USPSRA_4 USZOGBY_4"
+	foreach x of local var {
+	two USGALLUP_4 `x'
+	drop if syear ==.
+	
+	rename anchor_* a`x'_*
+	
+	egen mean_`x' = rowmean(a*)
+	
+	save gallup_`x'_two, replace 
+	}
+
+	
+* why backward not working ?? 
+    * error message : midpoint not found
+	use adj,clear
+	levelsof varname 
+	local var "ABC GSS PEW TRA_4 TRA_5  USCBS_3 USGALLUP_10 USKN_5 USORC_4 USPSRA_4 USZOGBY_4"
+	foreach x of local var {
+	two  `x' USGALLUP_4
+	drop if syear ==.
+	
+	rename anchor_* a`x'_*
+	
+	egen mean_`x' = rowmean(a*)
+	
+	save gallup_`x'_two, replace 
+	}
+	
+	
+	
+	
+*	use gallup_USZOGBY_4_two, clear 
+	
+	local var "ABC GSS PEW TRA_4 TRA_5  USCBS_3 USGALLUP_10 USKN_5 USORC_4 USPSRA_4"
+	foreach x of local var {
+	merge 1:1 enddate using gallup_`x'_two, nogen
+	
+	} 
+	drop anchor
+	rename a* anchor*
+	egen anchor= rowmean(anchor*)
+	rename anchor* a* 
+	rename a anchor
+	
+	save gallup_forward, replace 
+// 	egen mean=rowmean(mean*)
+//	
+// 	sort enddate  
+// 	#delimit; 
+// 	twoway (line anchor  enddate)
+// 	       (line mean  enddate)
+// 		   ;
+//    
+// 	# delimit cr
+
+	
+	twoway (line anchor    enddate, lwidth(medthick))
+
+	sort enddate  
+	#delimit; 
+	twoway (line anchor    enddate, lwidth(medthick))
+	       (line aPEW_2005 enddate, lp(solid) lcolor(gs6%30)) 
+		   (line aPEW_2006 enddate, lp(solid) lcolor(gs6%30))
+		   (line aPEW_2007 enddate, lp(solid) lcolor(gs6%30))
+		   (line aPEW_2008 enddate, lp(solid) lcolor(gs6%30))
+		   (line aPEW_2009 enddate, lp(solid) lcolor(gs6%30))
+		   (line aPEW_2010 enddate, lp(solid) lcolor(gs6%30))
+		   (line aPEW_2011 enddate, lp(solid) lcolor(gs6%30))
+		   (line aPEW_2012 enddate, lp(solid) lcolor(gs6%30))
+		   (line aPEW_2013 enddate, lp(solid) lcolor(gs6%30))
+		   (line aPEW_2015 enddate, lp(solid) lcolor(gs6%30))
+		   (line aPEW_2017 enddate, lp(solid) lcolor(gs6%30))
+		   
+		   (line aABC_1989 enddate, lp(solid) lcolor(gs6%30))
+		   (line aABC_1998 enddate, lp(solid) lcolor(gs6%30))
+		   (line aABC_2011 enddate, lp(solid) lcolor(gs6%30))
+		   (line aABC_2012 enddate, lp(solid) lcolor(gs6%30))
+
+		   (line aGSS_1977 enddate, lp(solid) lcolor(gs6%30))
+		   (line aGSS_1985 enddate, lp(solid) lcolor(gs6%30))
+		   (line aGSS_1989 enddate, lp(solid) lcolor(gs6%30))
+		   (line aGSS_1991 enddate, lp(solid) lcolor(gs6%30))
+		   (line aGSS_1993 enddate, lp(solid) lcolor(gs6%30))
+	   
+		   (line aTRA_5_2008 enddate, lp(solid) lcolor(gs6%30))
+		   (line aTRA_5_2006 enddate, lp(solid) lcolor(gs6%30))
+		   (line aTRA_5_2005 enddate, lp(solid) lcolor(gs6%30))
+		   (line aTRA_5_2004 enddate, lp(solid) lcolor(gs6%30))
+		   
+		   (line aTRA_4_2010 enddate, lp(solid) lcolor(gs6%30))
+		   (line aTRA_4_2011 enddate, lp(solid) lcolor(gs6%30))
+		   (line aTRA_4_2012 enddate, lp(solid) lcolor(gs6%30))
+
+		   (line aUSCBS_3_1979 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSCBS_3_1989 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSCBS_3_1998 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSCBS_3_1999 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSCBS_3_2001 enddate, lp(solid) lcolor(gs6%30))
+
+		   (line aUSGALLUP_10_1979 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSGALLUP_10_1993 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSGALLUP_10_1996 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSGALLUP_10_2001 enddate, lp(solid) lcolor(gs6%30))
+		   
+		   (line aUSKN_5_2002 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSKN_5_2004 enddate, lp(solid) lcolor(gs6%30)) 
+		   (line aUSKN_5_2006 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSKN_5_2008 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSKN_5_2010 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSKN_5_2013 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSKN_5_2014 enddate, lp(solid) lcolor(gs6%30))
+
+		   (line aUSORC_4_1987 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSORC_4_2009 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSORC_4_2011 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSORC_4_2014 enddate, lp(solid) lcolor(gs6%30))
+		  
+		   (line aUSPSRA_4_1998 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSPSRA_4_2013 enddate, lp(solid) lcolor(gs6%30))
+		   ,
+		   ylab(0(10)100)
+		   title(Gallup and every other survey)
+		   xtitle(year)
+		   legend(ring(0)
+				 order  (1 "Average" 
+				        ))	   
+		   ;
+	# delimit cr
+	
+	graph save Graph "$image\all_ave.gph" , replace 
+	
+	graph use "$image\all_ave.gph"
+	graph export "$image\all_ave.png", replace 
+	
+*------------------------------------------------
+	
+		sort enddate  
+	#delimit; 
+	twoway (line anchor    enddate, lwidth(medthick))
+	       (line aPEW_2005 enddate, lp(solid) lcolor(gs6%30)) 
+		   (line aPEW_2006 enddate, lp(solid) lcolor(gs6%30))
+		   (line aPEW_2007 enddate, lp(solid) lcolor(gs6%30))
+		   (line aPEW_2008 enddate, lp(solid) lcolor(gs6%30))
+		   (line aPEW_2009 enddate, lp(solid) lcolor(gs6%30))
+		   (line aPEW_2010 enddate, lp(solid) lcolor(gs6%30))
+		   (line aPEW_2011 enddate, lp(solid) lcolor(gs6%30))
+		   (line aPEW_2012 enddate, lp(solid) lcolor(gs6%30))
+		   (line aPEW_2013 enddate, lp(solid) lcolor(gs6%30))
+		   (line aPEW_2015 enddate, lp(solid) lcolor(gs6%30))
+		   (line aPEW_2017 enddate, lp(solid) lcolor(gs6%30))
+		   
+		   (line aABC_1989 enddate, lp(solid) lcolor(gs6%30))
+		   (line aABC_1998 enddate, lp(solid) lcolor(gs6%30))
+		   (line aABC_2011 enddate, lp(solid) lcolor(gs6%30))
+		   (line aABC_2012 enddate, lp(solid) lcolor(gs6%30))
+	   
+		   (line aTRA_5_2008 enddate, lp(solid) lcolor(gs6%30))
+		   (line aTRA_5_2006 enddate, lp(solid) lcolor(gs6%30))
+		   (line aTRA_5_2005 enddate, lp(solid) lcolor(gs6%30))
+		   (line aTRA_5_2004 enddate, lp(solid) lcolor(gs6%30))
+		   
+		   (line aTRA_4_2010 enddate, lp(solid) lcolor(gs6%30))
+		   (line aTRA_4_2011 enddate, lp(solid) lcolor(gs6%30))
+		   (line aTRA_4_2012 enddate, lp(solid) lcolor(gs6%30))
+
+		   (line aUSCBS_3_1979 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSCBS_3_1989 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSCBS_3_1998 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSCBS_3_1999 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSCBS_3_2001 enddate, lp(solid) lcolor(gs6%30))
+
+		   (line aUSGALLUP_10_1979 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSGALLUP_10_1993 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSGALLUP_10_1996 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSGALLUP_10_2001 enddate, lp(solid) lcolor(gs6%30))
+		   
+		   (line aUSKN_5_2002 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSKN_5_2004 enddate, lp(solid) lcolor(gs6%30)) 
+		   (line aUSKN_5_2006 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSKN_5_2008 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSKN_5_2010 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSKN_5_2013 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSKN_5_2014 enddate, lp(solid) lcolor(gs6%30))
+
+		   (line aUSORC_4_1987 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSORC_4_2009 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSORC_4_2011 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSORC_4_2014 enddate, lp(solid) lcolor(gs6%30))
+		  
+		   (line aUSPSRA_4_1998 enddate, lp(solid) lcolor(gs6%30))
+		   (line aUSPSRA_4_2013 enddate, lp(solid) lcolor(gs6%30))
+		   ,
+		   ylab(0(10)100)
+		   title(Gallup and every other survey)
+		   xtitle(year)
+		   legend(ring(0)
+				 order  (1 "Average" 
+				        ))	   
+		   ;
+	# delimit cr
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	sort syear  
+	#delimit; 
+	twoway (line mean_ABC syear)
+	       (line aABC_1989 syear, lp(solid) lcolor(gs3%30))
+		   (line aABC_1998 syear, lp(solid) lcolor(gs3%30))
+		   (line aABC_2011 syear, lp(solid) lcolor(gs3%30))
+		   (line aABC_2012 syear, lp(solid) lcolor(gs3%30))
+			  ,
+		   xlab(1970(10)2020)
+		   ylab(0(10)100)
+		   xtitle(year)
+		   legend(ring(0))
+		   ;
+	# delimit cr
+	graph save Graph "$image\ABC.gph", replace 
+
+	
+	
+	
+	sort syear  
+	#delimit; 
+	twoway	(line mean_GSS syear)
+			(line aGSS_1977 syear, lp(solid) lcolor(gs3%30))
+		   (line aGSS_1985 syear, lp(solid) lcolor(gs3%30))
+		   (line aGSS_1989 syear, lp(solid) lcolor(gs3%30))
+		   (line aGSS_1991 syear, lp(solid) lcolor(gs3%30))
+		   (line aGSS_1993 syear, lp(solid) lcolor(gs3%30))
+		   ,
+			   xlab(1970(10)2020)
+		   ylab(0(10)100)
+		   xtitle(year)
+		   legend(ring(0))
+		   ;
+			   ;
+	# delimit cr
+	graph save Graph "$image\GSS.gph", replace 
+
+	
+	sort syear   
+	#delimit; 
+		twoway	(line mean_TRA_5 syear )
+		   (line aTRA_5_2008 syear , lp(solid) lcolor(gs3%30))
+		   (line aTRA_5_2006 syear , lp(solid) lcolor(gs3%30))
+		   (line aTRA_5_2005 syear , lp(solid) lcolor(gs3%30))
+		   (line aTRA_5_2004 syear , lp(solid) lcolor(gs3%30))
+		   ,		  
+		   xlab(1970(10)2020)
+		   ylab(0(10)100)
+		   xtitle(year)
+		   legend(ring(0))
+		   ;
+	  
+	# delimit cr
+	graph save Graph "$image\TRA_5.gph", replace 
+
+	
+	sort syear   
+	#delimit; 
+	twoway	(line mean_TRA_4 syear )
+		   (line aTRA_4_2010 syear, lp(solid) lcolor(gs3%30))
+		   (line aTRA_4_2011 syear, lp(solid) lcolor(gs3%30))
+		   (line aTRA_4_2012 syear, lp(solid) lcolor(gs3%30))
+
+			   ,		  
+		   xlab(1970(10)2020)
+		   ylab(0(10)100)
+		   xtitle(year)
+		   legend(ring(0))
+		   ;
+
+	# delimit cr
+	graph save Graph "$image\TRA_4.gph", replace 
+
+
+	sort syear   
+	#delimit; 
+		twoway	(line mean_USCBS_3 syear )
+		   (line aUSCBS_3_1979 syear , lp(solid) lcolor(gs3%30))
+		   (line aUSCBS_3_1989 syear , lp(solid) lcolor(gs3%30))
+		   (line aUSCBS_3_1998 syear , lp(solid) lcolor(gs3%30))
+		   (line aUSCBS_3_1999 syear , lp(solid) lcolor(gs3%30))
+		   (line aUSCBS_3_2001 syear , lp(solid) lcolor(gs3%30))
+			   ,		  
+		   xlab(1970(10)2020)
+		   ylab(0(10)100)
+		   xtitle(year)
+		   legend(ring(0))
+		   ;
+
+	# delimit cr
+		graph save Graph "$image\CBS.gph", replace 
+
+		graph combine "$image\ABC.gph" "$image\GSS.gph" "$image\TRA_5.gph" "$image\TRA_4.gph"  ///
+		"$image\CBS.gph"
+
+	sort syear   
+	 #delimit; 
+		twoway	(line mean_USGALLUP_10 syear )
+		   (line aUSGALLUP_10_1979 syear , lp(solid) lcolor(gs3%30))
+		   (line aUSGALLUP_10_1993 syear , lp(solid) lcolor(gs3%30))
+		   (line aUSGALLUP_10_1996 syear , lp(solid) lcolor(gs3%30))
+		   (line aUSGALLUP_10_2001 syear , lp(solid) lcolor(gs3%30))
+		   
+		   			   ,		  
+		   xlab(1970(10)2020)
+		   ylab(0(10)100)
+		   xtitle(year)
+		   legend(ring(0))
+		   ;
+
+	# delimit cr
+	
+		   
+		   (line aUSKN_5_2002 syear , lp(solid) lcolor(gs3%30))
+		   (line aUSKN_5_2004 syear , lp(solid) lcolor(gs3%30)) 
+		   (line aUSKN_5_2006 syear , lp(solid) lcolor(gs3%30))
+		   (line aUSKN_5_2008 syear , lp(solid) lcolor(gs3%30))
+		   (line aUSKN_5_2010 syear , lp(solid) lcolor(gs3%30))
+		   (line aUSKN_5_2013 syear , lp(solid) lcolor(gs3%30))
+		   (line aUSKN_5_2014 syear , lp(solid) lcolor(gs3%30))
+
+		   (line aUSORC_4_1987 syear , lp(solid) lcolor(gs3%30))
+		   (line aUSORC_4_2009 syear , lp(solid) lcolor(gs3%30))
+		   (line aUSORC_4_2011 syear , lp(solid) lcolor(gs3%30))
+		   (line aUSORC_4_2014 syear , lp(solid) lcolor(gs3%30))
+		  
+		   (line aUSPSRA_4_1998 syear , lp(solid) lcolor(gs3%30))
+		   (line aUSPSRA_4_2013 syear , lp(solid) lcolor(gs3%30))
+	
+	
+	
+	
+// 	use adj.dta, clear
+// 	levelsof syear if varname =="ABC" , local(yr)
+//	
+// 	foreach x of local yr {
+//	
+// 	anchor `x' USGALLUP_4 ABC
+//	
+// 	g       anchor_`x' = mean_b_USGALLUP_4_`x'   if varname =="USGALLUP_4"    & syear <= `x'
+// 	replace anchor_`x' = mean_b_ABC_`x'          if varname =="ABC"          & syear > `x'
+//	
+// 	keep syear qid varname enddate anchor_`x'
+// 	drop if anchor_`x' ==.
+//
+//	
+// 	la var  anchor_`x' "Anchoring year: `x' "
+//
+// 	tempfile y`x'
+//     save `y`x'', replace 	
+// 	}
+//	
 	
 	
