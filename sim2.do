@@ -6,10 +6,11 @@
 * set trace off 
    
 *=======================simulation========================
-*global image "C:\Users\donghuiw\Dropbox\Website\US_project\image"  // pc 
-global image   "/Users/donghui/Dropbox/Website/US_project" // mac
+global image "C:\Users\donghuiw\Dropbox\Website\US_project\image"  // pc 
+*global image   "/Users/donghui/Dropbox/Website/US_project" // mac
 
 clear 
+
 *latent attitude :10 years,  
 set obs 100000
 set seed 12202019
@@ -20,19 +21,16 @@ g s=  int(10*runiform() + 1)
 expand 2 if inrange(s, 5,6)
 
 g mu =.
-g x  =. 
 forval i =1/10 {
-
-replace mu = sin(`i') if s ==`i'
-
-*replace mu = `i'+5 if s ==`i'
-
-replace x=rnormal(mu,1)
+	replace mu = sin(`i') if s ==`i'
 } 
-
+    tab mu if s==1 
+	g mu0= mu - .841471
+    g  y=rnormal(0,1) + mu0
 
 	sort s
-	twoway (line mu s) (scatter x s)
+	twoway (line mu s) (scatter y s) , xtitle(year)
+    graph export  "$image\attitude.png" , replace  
 	
 
 * simulate survey 
@@ -49,22 +47,22 @@ replace q= 2 if inrange(s, 7,10)
 replace q =int(2*runiform()+1) if inrange(s, 5,6)
 
 *cut-off points: based on percentile
-sum x, detail
+sum y, detail
 mat tau1 = (`r(p10)' \ `r(p50)' \ `r(p90)')
 mat tau2 = (`r(p10)' \ `r(p25)' \ `r(p75)' \ `r(p90)')
 
 
 g k=.
-  replace k= 1 if x< tau1[1,1]                    & q==1 
-  replace k= 2 if inrange(x,tau1[1,1], tau1[2,1]) & q==1 
-  replace k =3 if inrange(x,tau1[2,1], tau1[3,1]) & q==1 
-  replace k =4 if x>tau1[3,1] & q==1 
+  replace k= 1 if y< tau1[1,1]                    & q==1 
+  replace k= 2 if inrange(y,tau1[1,1], tau1[2,1]) & q==1 
+  replace k =3 if inrange(y,tau1[2,1], tau1[3,1]) & q==1 
+  replace k =4 if y>tau1[3,1] & q==1 
 
-  replace k= 1 if x< tau2[1,1]                    & q==2 
-  replace k= 2 if inrange(x,tau2[1,1], tau1[2,1]) & q==2
-  replace k =3 if inrange(x,tau2[2,1], tau1[3,1]) & q==2 
-  replace k =4 if inrange(x,tau2[3,1], tau1[4,1]) & q==2 
-  replace k =5 if x>tau2[4,1]                     & q==2
+  replace k= 1 if y< tau2[1,1]                    & q==2 
+  replace k= 2 if inrange(y,tau2[1,1], tau1[2,1]) & q==2
+  replace k =3 if inrange(y,tau2[2,1], tau1[3,1]) & q==2 
+  replace k =4 if inrange(y,tau2[3,1], tau1[4,1]) & q==2 
+  replace k =5 if y>tau2[4,1]                     & q==2
 
 
 
@@ -105,7 +103,7 @@ g k=.
    mat mub=b[1, 2..6]   
    
    
-   mat emu=def', mub'  // wtf it is the exact opposite sign ??
+   mat emu=def', mub'  
    
    svmat emu 
    g t=_n if !missing(emu1)
@@ -128,7 +126,7 @@ g k=.
   
 	// survey 1 
     replace `lnf' =ln(normal(`mu' - `tau1_1'))                             if $ML_y1 ==1 & q==1
-	replace `lnf' =ln(normal(`mu' -`tau1_2')  - normal(`mu'  - `tau1_1'))   if $ML_y1 ==2 & q==1
+	replace `lnf' =ln(normal(`mu' -`tau1_2')  - normal(`mu'  - `tau1_1'))  if $ML_y1 ==2 & q==1
     replace `lnf' =ln(normal(`mu' - `tau1_3')  - normal(`mu' - `tau1_2'))  if $ML_y1 ==3 & q==1
     replace `lnf' =ln(1 - normal(`mu' - `tau1_3'))                         if $ML_y1 ==4 & q==1
 	
@@ -153,6 +151,13 @@ g k=.
    
  //  ml graph
 
+//   *try gsem
+//   g k_1 = k if q==1
+//   g k_2 = k if q==2 
+//  
+//   gsem (k_1 <- i.s L@a, oprobit) (k_2 <- i.s L@a, oprobit)
+
+  
 
    matrix e_mu = c[1,2..10]
    mat e_ci=c[5..6,2..10]
@@ -165,7 +170,7 @@ g k=.
    replace emu= -1*emu1
    
    sort s t
-   twoway (line emu t) (line mu s) 
+   twoway (line emu t) (line mu s) , legend( lab(1 "Estimated")  lab(2 "Actural")) 
    
    
  *==========gllamm==============
