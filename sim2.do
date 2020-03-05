@@ -27,7 +27,7 @@ mat mu0=J(`n', 1, -99)
 	rename mu1 mu
 	gen s=_n if !missing(mu)
  
-	expand  1000
+	expand  10000
 	
 	*more observations at overlapping years 
 	expand 2 if inrange(s, 5,6)
@@ -45,7 +45,6 @@ g       q= 1 if inrange(s, 1,4)
 replace q= 2 if inrange(s, 7,10)
 
 *overlapping years : random assign 1, 2 
-
 replace q =int(2*runiform()+1) if inrange(s, 5,6)
 
 *cut-off points: based on percentile
@@ -67,12 +66,14 @@ g k=.
   replace k =4 if inrange(y,tau2[3,1], tau1[4,1]) & q==2 
   replace k =5 if y>tau2[4,1]                     & q==2
 
-
+  
+  
 
  *============================================================ 
   * starting from an ordered probit 
  
   program drop obit 
+  
   program define obit 
 
   args	 lnf mu tau1 tau2 tau3   // cut off point 
@@ -90,6 +91,7 @@ g k=.
    
    // keep only one survey
    
+   preserve 
    keep if q==1   
    
    ml model lf obit (k = i.s, noconstant) () () ()  // mu as a function of time, other only constant
@@ -102,6 +104,7 @@ g k=.
    
    mat def=a[1, 1..6]
    
+   
    *stata's buit in function 
    oprobit k  i.s  // oprobit looks fine 
    mat b=r(table)
@@ -109,7 +112,9 @@ g k=.
    
    mat mu0_one= mu0[1..6,1]
    
-   mat emu=mub' , mu0_one   
+   *compare user-written function and actual trend 
+   
+   mat emu=mu0_one , def'   
    
    svmat emu 
    rename emu1 Estimates
@@ -120,7 +125,8 @@ g k=.
    sort t 
    twoway (line Actural t)  (line Estimates t) 
    graph export  "$image\first.png" , replace  
-
+  
+   restore 
    
 *============================================
    
@@ -157,21 +163,31 @@ g k=.
 
    ml check 
    ml search    
-   ml maximize 
+   ml maximize , difficult
    mat c=r(table)
    
 
+   mat e_mu = c[1,1..10]'
+   mat e_ci=c[5..6,2..10]'
+   
+   mat e_tau1=c[1,11..13]'
+   mat e_tau2=c[1,14..17]'
+   
+   mat com_mu=mu0, e_mu
+   
+   *compare actural Vs estimated cut-off
+   mat com_tau1=tau1,e_tau1
+   mat com_tau2=tau2,e_tau2
+   
+   mat list com_tau1 , format (%9.3f) 
+   mat list com_tau2 , format (%9.3f) 
 
-   matrix e_mu = c[1,1..10]
-   mat e_ci=c[5..6,2..10]
    
-   mat compare=mu0, e_mu'
+   *graph estimated results   
+   svmat com_mu
+   rename com_mu1 Actural
+   rename com_mu2 Estimate
    
-   svmat compare
-   rename compare1 Actural
-   rename compare2 Estimate
-   
-   g dif= Actural - Estimate
    
    gen t= _n if !missing(Actural)
    
@@ -181,7 +197,102 @@ g k=.
    
    graph export  "$image\twosurvey_simulation.png" , replace  
 
- *==========gllamm==============
+   
+ *========== Extend to multiple surveys ==============
+ *simulate the third  survey : runs from 3 - 7 
+  
+  local newobs = _N + 5 
+  set obs `newobs' 
+  
+  replace q =3 if q ==.
+  
+  bysort q: replace s=_n+2 if mu ==. & q ==3 
+  
+  expand 1000 if mu ==.
+ 
+  
+  forvalues i = 3/7 {
+  replace mu= mu0[`i', 1] if mu ==. 
+  replace y = mu0[`i', 1] + rnormal(0,1) if k ==.
+  
+  }
+  
+  *three levels , two cut - off points 
+  sum y if q== 3, detail
+  mat tau3 = (`r(p25)' \ `r(p75)')
+  
+  
+  replace k= 1 if y< tau3[1,1]                    & q==3 
+  replace k= 2 if inrange(y,tau3[1,1], tau3[2,1]) & q==3
+  replace k =3 if y>tau3[2,1]                     & q==3
+
+  
+  
+  program drop obit 
+  
+  program define obit 
+
+  args 	 lnf mu tau1_1 tau1_2 tau1_3 tau2_1 tau2_2  tau2_3 tau2_4  tau3_1 tau3_2  // cut off point 
+
+  quietly {
+  
+	// survey 1 
+    replace `lnf' =ln(normal(`tau1_1' -`mu'))                             if $ML_y1 ==1 & q==1
+	replace `lnf' =ln(normal(`tau1_2'  -`mu')  - normal(`tau1_1' -`mu' )) if $ML_y1 ==2 & q==1
+    replace `lnf' =ln(normal(`tau1_3'  -`mu')  - normal(`tau1_2' -`mu'))  if $ML_y1 ==3 & q==1
+    replace `lnf' =ln(1 - normal(`tau1_3'  -`mu' ))                       if $ML_y1 ==4 & q==1
+	
+	// survey 2
+	replace `lnf' =ln(normal( `tau2_1' -`mu'))                            if $ML_y1 ==1 & q==2
+	replace `lnf' =ln(normal(`tau2_2' -`mu')  - normal( `tau2_1' -`mu'))  if $ML_y1 ==2 & q==2
+    replace `lnf' =ln(normal(`tau2_3' -`mu')  - normal( `tau2_2' -`mu'))  if $ML_y1 ==3 & q==2
+	replace `lnf' =ln(normal(`tau2_4' -`mu')  - normal( `tau2_3' -`mu'))  if $ML_y1 ==4 & q==2
+    replace `lnf' =ln(1 - normal(`tau2_4'  -`mu'))                        if $ML_y1 ==5 & q==2
+	
+	// survey 3 
+	replace `lnf' =ln(normal( `tau3_1' -`mu'))                            if $ML_y1 ==1 & q==3
+	replace `lnf' =ln(normal(`tau3_2' -`mu')  - normal( `tau3_1' -`mu'))  if $ML_y1 ==2 & q==3
+    replace `lnf' =ln(1 - normal(`tau3_2'  -`mu'))                        if $ML_y1 ==3 & q==3
+	
+	
+  }
+ end 
+
+   ml model lf obit (k= i.s, noconstant)  ///
+					 ()  ()  ()            ///
+	                 ()  ()  ()  ()       ///
+					 ()  ()
+
+   ml check 
+   ml search    
+   ml maximize , difficult
+   mat c=r(table)
+ 
+   mat e_mu= c[1,1..10]'
+   mat e_ci=c[5..6,1..10]'
+   
+   mat e_tau1=c[1,11..13]'
+   mat e_tau2=c[1,14..17]'
+   mat e_tau3=c[1,18..19]'
+   
+   mat com_mu=mu0, e_mu
+   
+   mat com_tau3=tau3, e_tau3
+   
+   *graph estimated results   
+   svmat com_mu
+   rename com_mu1 Actural
+   rename com_mu2 Estimate
+   
+   
+   gen t= _n if !missing(Actural)
+   
+   
+   sort  t
+   twoway (line Actural t) (line Estimate t) , xlab (1/10) 
+   
+
+ 
 // program drop _all 
 // program define par_shift
 //
