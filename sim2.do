@@ -1,9 +1,6 @@
 * simulation 
 *created on 03/03/2020
 
-
-
-* set trace off 
    
 *=======================simulation========================
 global image "C:\Users\donghuiw\Dropbox\Website\US_project\image"  // pc 
@@ -11,30 +8,35 @@ global image "C:\Users\donghuiw\Dropbox\Website\US_project\image"  // pc
 
 clear 
 
-*latent attitude :10 years,  
-set obs 100000
-set seed 12202019
+*latent attitude mean 
 
-g s=  int(10*runiform() + 1)  
+numlist "1/10"
+local n :word count `r(numlist)'
+mat mu=J(`n', 1, -99)
+mat mu0=J(`n', 1, -99)
 
-*more observations at overlapping years 
-expand 2 if inrange(s, 5,6)
+	forval i =1/10 {
+	  mat mu[`i', 1] = sin(`i')
+	  
+	  mat mu0[`i', 1]=mu[`i'-.84147098, 1]  // anchor 1st yr to be zero
+	} 
+	
+	mat mu0[1, 1] = 0
+	
+	svmat mu0, names(mu)
+	rename mu1 mu
+	gen s=_n if !missing(mu)
+ 
+	expand  1000
+	
+	*more observations at overlapping years 
+	expand 2 if inrange(s, 5,6)
 
-g mu =.
-forval i =1/10 {
-	replace mu = sin(`i') if s ==`i'
-} 
-    tab mu if s==1 
-	g mu0= mu - .841471
-    g  y=rnormal(0,1) + mu0
+	g  y=rnormal(0,1) + mu
 
-	sort s
-	twoway (line mu s) (scatter y s) , xtitle(year)
-    graph export  "$image\attitude.png" , replace  
 	
 
 * simulate survey 
-
 * survey 1: yr 1 - 6 ,  4 scale : 1, 2, 3, 4 ;       
 * survey 2: yr 4 - 10 , 5 scale : 1, 2, 3, ,4, 5 ;  
 
@@ -50,6 +52,7 @@ replace q =int(2*runiform()+1) if inrange(s, 5,6)
 sum y, detail
 mat tau1 = (`r(p10)' \ `r(p50)' \ `r(p90)')
 mat tau2 = (`r(p10)' \ `r(p25)' \ `r(p75)' \ `r(p90)')
+
 
 
 g k=.
@@ -76,17 +79,19 @@ g k=.
   
   quietly {
   
-    replace `lnf' =ln(normal(`mu' - `tau1'))                           if $ML_y1 ==1 
-    replace `lnf' =ln(normal(`mu' - `tau2')  - normal(`mu' - `tau1'))  if $ML_y1 ==2 
-    replace `lnf' =ln(normal(`mu' - `tau3')  - normal(`mu' - `tau2'))  if $ML_y1 ==3 
-    replace `lnf' =ln(1 - normal(`mu' - `tau3'))                       if $ML_y1 ==4 
+    replace `lnf' =ln(normal(`tau1' - `mu' ))                           if $ML_y1 ==1 
+    replace `lnf' =ln(normal(`tau2' - `mu')  -  normal(`tau1' - `mu'  ))  if $ML_y1 ==2 
+    replace `lnf' =ln(normal(`tau3' - `mu' )  - normal(`tau2' - `mu'  ))  if $ML_y1 ==3 
+    replace `lnf' =ln(1 - normal(`tau3' - `mu' ))                       if $ML_y1 ==4 
 
   }
  end 
    
-   keep if q==1  // keep only one survey 
    
-  
+   // keep only one survey
+   
+   keep if q==1   
+   
    ml model lf obit (k = i.s, noconstant) () () ()  // mu as a function of time, other only constant
    ml check 
    ml search 
@@ -95,22 +100,28 @@ g k=.
    return list
    mat a=r(table)
    
-   mat def=a[1, 2..6]
+   mat def=a[1, 1..6]
    
    *stata's buit in function 
    oprobit k  i.s  // oprobit looks fine 
    mat b=r(table)
-   mat mub=b[1, 2..6]   
+   mat mub=b[1, 1..6]   
    
+   mat mu0_one= mu0[1..6,1]
    
-   mat emu=def', mub'  
+   mat emu=mub' , mu0_one   
    
    svmat emu 
-   g t=_n if !missing(emu1)
+   rename emu1 Estimates
+   rename emu2 Actural 
+   
+   g t=_n if !missing(Estimates)
    
    sort t 
-   twoway (line emu1 t) (line emu2 t) (scatter mu s)
- 
+   twoway (line Actural t)  (line Estimates t) 
+   graph export  "$image\first.png" , replace  
+
+   
 *============================================
    
 
@@ -125,54 +136,51 @@ g k=.
   quietly {
   
 	// survey 1 
-    replace `lnf' =ln(normal(`mu' - `tau1_1'))                             if $ML_y1 ==1 & q==1
-	replace `lnf' =ln(normal(`mu' -`tau1_2')  - normal(`mu'  - `tau1_1'))  if $ML_y1 ==2 & q==1
-    replace `lnf' =ln(normal(`mu' - `tau1_3')  - normal(`mu' - `tau1_2'))  if $ML_y1 ==3 & q==1
-    replace `lnf' =ln(1 - normal(`mu' - `tau1_3'))                         if $ML_y1 ==4 & q==1
+    replace `lnf' =ln(normal(`tau1_1' -`mu'))                             if $ML_y1 ==1 & q==1
+	replace `lnf' =ln(normal(`tau1_2'  -`mu')  - normal(`tau1_1' -`mu' )) if $ML_y1 ==2 & q==1
+    replace `lnf' =ln(normal(`tau1_3'  -`mu')  - normal(`tau1_2' -`mu'))  if $ML_y1 ==3 & q==1
+    replace `lnf' =ln(1 - normal(`tau1_3'  -`mu' ))                       if $ML_y1 ==4 & q==1
 	
 	// survey 2
-	replace `lnf' =ln(normal(`mu' - `tau2_1'))                             if $ML_y1 ==1 & q==2
-	replace `lnf' =ln(normal(`mu' - `tau2_2')  - normal(`mu' - `tau2_1'))  if $ML_y1 ==2 & q==2
-    replace `lnf' =ln(normal(`mu' - `tau2_3')  - normal(`mu' - `tau2_2'))  if $ML_y1 ==3 & q==2
-	replace `lnf' =ln(normal(`mu' - `tau2_4')  - normal(`mu' - `tau2_3'))  if $ML_y1 ==4 & q==2
-    replace `lnf' =ln(1 - normal(`mu' - `tau2_4'))                         if $ML_y1 ==5 & q==2
+	replace `lnf' =ln(normal( `tau2_1' -`mu'))                            if $ML_y1 ==1 & q==2
+	replace `lnf' =ln(normal(`tau2_2' -`mu')  - normal( `tau2_1' -`mu'))  if $ML_y1 ==2 & q==2
+    replace `lnf' =ln(normal(`tau2_3' -`mu')  - normal( `tau2_2' -`mu'))  if $ML_y1 ==3 & q==2
+	replace `lnf' =ln(normal(`tau2_4' -`mu')  - normal( `tau2_3' -`mu'))  if $ML_y1 ==4 & q==2
+    replace `lnf' =ln(1 - normal(`tau2_4'  -`mu'))                        if $ML_y1 ==5 & q==2
 	
   }
  end 
 
-    
     ml model lf obit (k= i.s, noconstant)  ///
 					 ()  ()  ()            ///
 	                 ()  ()  ()  ()       
+
    ml check 
    ml search    
-   ml maximize , difficult 
+   ml maximize 
    mat c=r(table)
    
- //  ml graph
 
-//   *try gsem
-//   g k_1 = k if q==1
-//   g k_2 = k if q==2 
-//  
-//   gsem (k_1 <- i.s L@a, oprobit) (k_2 <- i.s L@a, oprobit)
 
-  
-
-   matrix e_mu = c[1,2..10]
+   matrix e_mu = c[1,1..10]
    mat e_ci=c[5..6,2..10]
-   mat emu=e_mu'
    
-   svmat emu
+   mat compare=mu0, e_mu'
    
-   gen t= _n if !missing(emu1)
+   svmat compare
+   rename compare1 Actural
+   rename compare2 Estimate
    
-   replace emu= -1*emu1
+   g dif= Actural - Estimate
    
-   sort s t
-   twoway (line emu t) (line mu s) , legend( lab(1 "Estimated")  lab(2 "Actural")) 
+   gen t= _n if !missing(Actural)
    
    
+   sort  t
+   twoway (line Actural t) (line Estimate t) , xlab (1/10) 
+   
+   graph export  "$image\twosurvey_simulation.png" , replace  
+
  *==========gllamm==============
 // program drop _all 
 // program define par_shift
